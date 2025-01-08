@@ -1,5 +1,3 @@
-;ld z.o rnd.o delay.o -lc -lncurses -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o a
-
 format ELF64
 
 	public _start
@@ -83,83 +81,59 @@ _start:
 	mov [palette], rax
 	mov [count], 0
         
-	xor r15, r15 ; расстояние Y
-	xor rbp, rbp ; расстояние X
+	
+	xor rbp, rbp ; расстояние
 	xor r12, r12 ; направление
 	xor r13, r13 ; ось x
 	xor r14, r14 ; ось y
-	
-	mov rbp, 3
-	mov r15, 1
+	mov rbp, 1
 	;; Главный цикл программы
 	mov r12, 0
 
-	mov r13, 1
-	mov r14, 2
-	jmp mloop
-
-
 mloop:
-	; start init
+	; start init	
 
 	@@:
 	cmp r12, 0
-	je .up
-	cmp r12, 1
 	je .right
-	cmp r12, 2
-	je .down
-	cmp r12, 3
+	cmp r12, 1
 	je .left
 	jmp @f
 	
-	.up:
-		dec r14
-		cmp r14, 0
-		je .nextU
-		jmp @f
-		.nextU:
-			inc r14
-			;sub r13, 1
-			mov r12, 1
-			add r15, 2
-			jmp @f
-		jmp @f
 	.right:
 		inc r13
 		cmp r13, rbp
-		jg .nextR
-		jmp @f
-		.nextR:
-			dec r13
-			add r13, 2
-			mov r12, 2
-			add rbp, 2
-			jmp @f
-		jmp @f
-	.down:
-		inc r14
-		cmp r14, r15
-		jg .nextD
-		jmp @f
-		.nextD:
-			dec r14
-			add r14, 2
-			mov r12, 3
-			add r15, 2
-			jmp @f
+		jg .plusdist
 		jmp @f
 	.left:
 		dec r13
-		cmp r13, 0
-		je .nextL
+		neg r13
+		cmp r13, rbp
+		neg r13
+		jl .plusdist2
 		jmp @f
-		.nextL:
-			inc r13
-			;sub r13, 1
-			mov r12, 0
-			add rbp, 2
-			jmp @f
+
+	.plusdist:
+		inc rbp ; plus distance
+		inc r12
+		cmp r12, 2
+		je .reset
+		;jmp mloop
+		jmp @f
+		.reset:
+			xor r12, r12
+		;jmp mloop
+		jmp @f
+	.plusdist2:
+		inc rbp ; plus distance
+		inc r12
+		cmp r12, 2
+		je .reset2
+		jmp mloop
+		;jmp @f
+		.reset2:
+			xor r12, r12
+		jmp mloop
 		jmp @f
 
 	@@:
@@ -170,9 +144,6 @@ mloop:
 	; rax - центр экрана по x
 	;add rax, r13
 
-	;mov r13, r15
-	;add rax, r13
-	
 	push rdx
 	push rcx
 	push rax
@@ -197,25 +168,21 @@ mloop:
 	xor rdx, rdx
 	div rcx
 	; rax - центр экрана по y
-	;mov r14, rbp
 	;add rax, r14
 
 	push rdx
 	push rcx
 	push rax
-		mov rax, r15
-		mov rcx, 2
-		xor rdx, rdx
-		div rcx
-		mov rdx, rax
+	mov rax, rbp
+	mov rcx, 2
+    xor rdx, rdx
+    div rcx
+	mov rdx, rax
     pop rax
-		add rax, r14
-		sub rax, rdx
+	add rax, r14
+	sub rax, rdx
 	pop rcx
 	pop rdx
-
-	
-
 
 	mov [rand_y], rax
 	
@@ -224,26 +191,20 @@ mloop:
 	mov rsi, [rand_x]
 	call move
 
+
+
 	mov rax, [palette]
 	and rax, 0x100
-	cmp rax, 0x100
-	jne @f
+	
+	cmp r12, 0
+	je @f
+	cmp r12, 2
+	je @f
 	call get_digit
 	or rax, 0x100
 	mov [palette],rax
 	jmp yy
 	@@:
-	
-	cmp rbp, 140
-	jge .rest
-	jmp .skiprest
-	.rest:
-		mov rbp, 3
-		mov r15, 1
-		mov r12, 0
-		mov r13, 1
-		mov r14, 2
-	.skiprest:
 	call get_digit
 	or rax, 0x200
 	mov [palette],rax
@@ -252,23 +213,33 @@ mloop:
 	call addch
 
 
+	mov rdi, 0
+	mov rsi, 100
+	call move
 
-	;mov rdi, 20
-	;mov rsi, 30
-	;call move
+	cmp r12, 0
+	je .debug0
 
-	;mov rax, r12
-	;call print
+	cmp r12, 1
+	je .debug1
+
+	.debug0:
+		push rax
+		mov rax, r13
+		jmp @f
+	.debug1:
+		push rax
+		mov rax, r13
+		jmp @f
+	@@:
+	;mov rax, rbp
+	call print
+	pop rax
 	
 
+	
 	;; Задержка
-	cmp rax, 'f'
-	je fast
-	mov rdi,1000
-	jmp skipfast
-	fast:
-	mov rdi, 1
-	skipfast:
+	mov rdi,500000
 	call mydelay
 
 	;; Обновляем экран и количество выведенных знакомест в заданной палитре
@@ -326,7 +297,7 @@ get_digit:
 	xor rdx, rdx
 	div rcx
 	xor rax,rax
-	mov al, ' '; [digit + rdx]
+	mov al, [digit + rdx]
 	pop rdx
 	pop rcx
 	ret
@@ -336,7 +307,12 @@ get_digit:
 print:
 	cmp rax, 0
 	jge @f
-	mov rax, 9999999
+	neg rax
+	mov rax, 4
+    mov rbx, 1
+    mov rcx, minus
+    mov rdx, 2
+    int 0x80
 
 	@@:
     mov rcx, 10

@@ -1,5 +1,3 @@
-;ld z.o rnd.o delay.o -lc -lncurses -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o a
-
 format ELF64
 
 	public _start
@@ -25,6 +23,7 @@ format ELF64
 	extrn cbreak
 	extrn timeout
 	extrn mydelay
+	extrn mysin
 	extrn setrnd
 	extrn get_random
 
@@ -85,7 +84,7 @@ _start:
         
 	xor r15, r15 ; расстояние Y
 	xor rbp, rbp ; расстояние X
-	xor r12, r12 ; направление
+	xor r12, r12 ; значение времени
 	xor r13, r13 ; ось x
 	xor r14, r14 ; ось y
 	
@@ -102,117 +101,28 @@ _start:
 mloop:
 	; start init
 
-	@@:
-	cmp r12, 0
-	je .up
-	cmp r12, 1
-	je .right
-	cmp r12, 2
-	je .down
-	cmp r12, 3
-	je .left
-	jmp @f
+	inc r13
 	
-	.up:
-		dec r14
-		cmp r14, 0
-		je .nextU
-		jmp @f
-		.nextU:
-			inc r14
-			;sub r13, 1
-			mov r12, 1
-			add r15, 2
-			jmp @f
-		jmp @f
-	.right:
-		inc r13
-		cmp r13, rbp
-		jg .nextR
-		jmp @f
-		.nextR:
-			dec r13
-			add r13, 2
-			mov r12, 2
-			add rbp, 2
-			jmp @f
-		jmp @f
-	.down:
-		inc r14
-		cmp r14, r15
-		jg .nextD
-		jmp @f
-		.nextD:
-			dec r14
-			add r14, 2
-			mov r12, 3
-			add r15, 2
-			jmp @f
-		jmp @f
-	.left:
-		dec r13
-		cmp r13, 0
-		je .nextL
-		jmp @f
-		.nextL:
-			inc r13
-			;sub r13, 1
-			mov r12, 0
-			add rbp, 2
-			jmp @f
-		jmp @f
-
-	@@:
-	mov rax, [xmax]
-	mov rcx, 2
-	xor rdx, rdx
-	div rcx
-	; rax - центр экрана по x
-	;add rax, r13
-
-	;mov r13, r15
-	;add rax, r13
 	
-	push rdx
-	push rcx
-	push rax
-		mov rax, rbp
-		mov rcx, 2
-		xor rdx, rdx
-		div rcx
-		mov rdx, rax
-    pop rax
-		add rax, r13
-		sub rax, rdx
-	pop rcx
-	pop rdx
-
+	@@:
+	mov rax, r13
+	
 	mov [rand_x], rax
 
 
-
+	mov rdi, r13
+	call mysin
+	mov r14, rax
 	
 	mov rax, [ymax]
 	mov rcx, 2
 	xor rdx, rdx
 	div rcx
 	; rax - центр экрана по y
-	;mov r14, rbp
-	;add rax, r14
 
-	push rdx
-	push rcx
-	push rax
-		mov rax, r15
-		mov rcx, 2
-		xor rdx, rdx
-		div rcx
-		mov rdx, rax
-    pop rax
-		add rax, r14
-		sub rax, rdx
-	pop rcx
-	pop rdx
+	add rax, r14 ; or add
+	
+
 
 	
 
@@ -261,14 +171,9 @@ mloop:
 	;call print
 	
 
+	
 	;; Задержка
-	cmp rax, 'f'
-	je fast
-	mov rdi,1000
-	jmp skipfast
-	fast:
-	mov rdi, 1
-	skipfast:
+	mov rdi,10000
 	call mydelay
 
 	;; Обновляем экран и количество выведенных знакомест в заданной палитре
@@ -326,7 +231,7 @@ get_digit:
 	xor rdx, rdx
 	div rcx
 	xor rax,rax
-	mov al, ' '; [digit + rdx]
+	mov al, ' ';[digit + rdx]
 	pop rdx
 	pop rcx
 	ret
